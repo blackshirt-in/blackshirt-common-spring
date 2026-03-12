@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - dev
-      - prod
-    # Removing paths since the workflow itself is now inside blackshirt-common/cms-common
-    # If this is pushed as a sub-repo, it will naturally build.
+  pull_request:
+    branches:
+      - main
 
 jobs:
   publish:
@@ -24,13 +24,16 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          # This configures Maven to use the GitHub Packages registry and sets up authentication
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
       - name: Build and Publish with Maven
-        # Removed working-directory because the workflow is inside the project root now (assuming cms-common is the repo root here)
-        run: mvn -B clean deploy
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            mvn -B clean deploy
+          else
+            mvn -B clean install
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

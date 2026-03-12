@@ -3,7 +3,10 @@ package com.blackshirt.cms.common.config;
 import com.blackshirt.cms.common.exception.GlobalExceptionHandler;
 import com.blackshirt.cms.common.logging.LoggingAspect;
 import com.blackshirt.cms.common.filter.MdcFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -28,5 +31,13 @@ public class CmsCommonAutoConfiguration {
         FilterRegistrationBean<MdcFilter> registration = new FilterRegistrationBean<>(mdcFilter);
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return mapper;
     }
 }

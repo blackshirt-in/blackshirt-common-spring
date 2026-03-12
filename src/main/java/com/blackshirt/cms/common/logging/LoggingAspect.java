@@ -9,6 +9,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -24,8 +25,8 @@ public class LoggingAspect {
     private final ObjectMapper objectMapper;
     private static final Logger logger = LoggerFactory.getLogger(LoggingAspect.class);
 
-    public LoggingAspect(LoggingProperties loggingProperties, 
-                         @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper) {
+    public LoggingAspect(LoggingProperties loggingProperties,
+            @Autowired ObjectMapper objectMapper) {
         this.loggingProperties = loggingProperties;
         this.objectMapper = objectMapper;
     }
@@ -54,7 +55,7 @@ public class LoggingAspect {
 
         try {
             if (logActivity.logArgs() && logger.isInfoEnabled()) {
-                String args = (objectMapper != null) ? objectMapper.writeValueAsString(joinPoint.getArgs()) : "Args logging enabled but ObjectMapper missing";
+                String args = objectMapper.writeValueAsString(joinPoint.getArgs());
                 logger.info("[{}] STARTED - Args: {}", actionName, args);
             } else {
                 logger.info("[{}] STARTED", actionName);
@@ -65,15 +66,10 @@ public class LoggingAspect {
             long executionTime = System.currentTimeMillis() - start;
 
             if (logActivity.logResult() && logger.isInfoEnabled()) {
-                String stringResult = null;
-                if (objectMapper != null) {
-                    stringResult = objectMapper.writeValueAsString(result);
-                    // Truncate response if it's too large to prevent blowing up logs
-                    if (stringResult != null && stringResult.length() > 2000) {
-                        stringResult = stringResult.substring(0, 2000) + "... [TRUNCATED]";
-                    }
-                } else {
-                    stringResult = "Result logging enabled but ObjectMapper missing";
+                String stringResult = objectMapper.writeValueAsString(result);
+                // Truncate response if it's too large to prevent blowing up logs
+                if (stringResult != null && stringResult.length() > 2000) {
+                    stringResult = stringResult.substring(0, 2000) + "... [TRUNCATED]";
                 }
                 logger.info("[{}] COMPLETED - Result: {}", actionName, stringResult);
             } else {

@@ -15,9 +15,9 @@ import org.springframework.core.Ordered;
 @AutoConfiguration
 @org.springframework.context.annotation.Configuration
 @Import({
-    LoggingProperties.class,
-    LoggingAspect.class,
-    GlobalExceptionHandler.class
+        LoggingProperties.class,
+        LoggingAspect.class,
+        GlobalExceptionHandler.class
 })
 public class CmsCommonAutoConfiguration {
 
@@ -34,7 +34,6 @@ public class CmsCommonAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean
     public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());

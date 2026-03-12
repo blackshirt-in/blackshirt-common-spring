@@ -40,3 +40,4 @@ The library uses Spring Boot's Auto-configuration. Ensure that the package `com.
 ## CI/CD
 
 The project includes a GitHub Action workflow to automatically publish the library to GitHub Packages when changes are pushed to `dev` or `main` branches. It also runs a build verification for Pull Requests targeting these branches.
+

@@ -70,8 +70,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <!-- Replace USERNAME with actual GitHub username/organization containing blackshirt-common -->
-            <url>https://maven.pkg.github.com/USERNAME/blackshirt-common</url>
+            <url>https://maven.pkg.github.com/blackshirt-cms/cms-common</url>
         </repository>
     </distributionManagement>
 

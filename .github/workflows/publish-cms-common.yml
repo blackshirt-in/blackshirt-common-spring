@@ -24,6 +24,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: maven
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
@@ -31,9 +32,9 @@ jobs:
       - name: Build and Publish with Maven
         run: |
           if [ "${{ github.event_name }}" == "push" ]; then
-            mvn -B clean deploy
+            mvn -B -T 1C clean deploy -ntp
           else
-            mvn -B clean install
+            mvn -B -T 1C clean install -ntp
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

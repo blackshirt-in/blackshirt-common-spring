@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 
 @AutoConfiguration
+@org.springframework.context.annotation.Configuration
 @Import({
     LoggingProperties.class,
     LoggingAspect.class,

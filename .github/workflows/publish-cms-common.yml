@@ -1,0 +1,36 @@
+name: Publish CMS Common to GitHub Packages
+
+on:
+  push:
+    branches:
+      - dev
+      - prod
+    # Removing paths since the workflow itself is now inside blackshirt-common/cms-common
+    # If this is pushed as a sub-repo, it will naturally build.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          # This configures Maven to use the GitHub Packages registry and sets up authentication
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Build and Publish with Maven
+        # Removed working-directory because the workflow is inside the project root now (assuming cms-common is the repo root here)
+        run: mvn -B clean deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

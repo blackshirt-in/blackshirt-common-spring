@@ -17,10 +17,10 @@ A shared library for the Blackshirt CMS project, providing common utilities, con
 
 ## Building the Project
 
-To build the library and install it to your local Maven repository:
+To build the library and install it to your local Maven repository (optimized for speed):
 
 ```bash
-mvn clean install
+mvn clean install -T 1C -ntp
 ```
 
 ## Usage

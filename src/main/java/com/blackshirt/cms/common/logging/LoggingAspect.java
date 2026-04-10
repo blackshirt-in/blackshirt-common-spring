@@ -9,6 +9,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,8 @@ public class LoggingAspect {
     private final ObjectMapper objectMapper;
     private static final Logger logger = LoggerFactory.getLogger(LoggingAspect.class);
 
-    public LoggingAspect(LoggingProperties loggingProperties, ObjectMapper objectMapper) {
+    public LoggingAspect(LoggingProperties loggingProperties,
+            @Autowired ObjectMapper objectMapper) {
         this.loggingProperties = loggingProperties;
         this.objectMapper = objectMapper;
     }

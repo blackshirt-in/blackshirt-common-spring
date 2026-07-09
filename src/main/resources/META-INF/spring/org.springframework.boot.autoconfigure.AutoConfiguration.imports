@@ -1,2 +1,1 @@
-com.blackshirt.cms.common.config.CmsCommonAutoConfiguration
-
+in.blackshirt.common.config.BlackshirtAutoConfiguration

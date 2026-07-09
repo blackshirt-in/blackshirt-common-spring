@@ -10,45 +10,32 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>com.blackshirt.cms</groupId>
-    <artifactId>cms-common</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>cms-common</name>
-    <description>Common Utility Library for Blackshirt CMS</description>
+    <groupId>in.blackshirt</groupId>
+    <artifactId>blackshirt-common-spring</artifactId>
+    <version>0.1.0</version>
+    <name>blackshirt-common-spring</name>
+    <description>Common Spring Boot Framework Utility Library for Blackshirt Organization</description>
 
     <properties>
-        <java.version>17</java.version>
-        <spring-boot.version>4.0.0</spring-boot.version>
+        <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
+        <!-- All consumers are Spring Boot web apps, so this is always provided at runtime.
+             Transitively supplies: spring-web, spring-context, spring-boot-autoconfigure,
+             jackson-databind, jackson-datatype-jsr310, slf4j-api, jakarta.servlet-api -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <version>${spring-boot.version}</version>
             <scope>provided</scope>
         </dependency>
 
+        <!-- Tracer / Span API for distributed tracing. Consumer provides the bridge
+             implementation (micrometer-tracing-bridge-otel or bridge-brave). -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
-            <version>4.0.0-M2</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing</artifactId>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -57,7 +44,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/blackshirt-cms/cms-common</url>
+            <url>https://maven.pkg.github.com/blackshirt-in/blackshirt-common-spring</url>
         </repository>
     </distributionManagement>
 

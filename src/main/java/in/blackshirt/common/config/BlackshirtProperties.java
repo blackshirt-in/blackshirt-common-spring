@@ -1,12 +1,17 @@
 package in.blackshirt.common.config;
 
-import jakarta.annotation.Nonnull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "blackshirt")
-public record BlackshirtProperties(
-        Log log) {
-    public record Log(
-            @Nonnull String serviceName) {
-    }
+public class BlackshirtProperties {
+
+        private Log log;
+
+        class Log {
+                private String serviceName;
+
+                public void setServiceName(String serviceName) {
+                        this.serviceName = serviceName;
+                }
+        }
 }

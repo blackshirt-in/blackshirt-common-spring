@@ -12,7 +12,7 @@
 
     <groupId>in.blackshirt</groupId>
     <artifactId>blackshirt-common-spring</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <name>blackshirt-common-spring</name>
     <description>Common Spring Boot Framework Utility Library for Blackshirt Organization</description>
 

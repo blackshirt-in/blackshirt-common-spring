@@ -16,10 +16,14 @@ import java.util.Optional;
 /**
  * Central factory for building consistent API responses.
  *
- * <p>Injects infrastructure beans ({@link Tracer}, {@link BlackshirtProperties}) once
- * so that controllers never need to deal with trace IDs, service names, or timestamps.
+ * <p>
+ * Injects infrastructure beans ({@link Tracer}, {@link BlackshirtProperties})
+ * once
+ * so that controllers never need to deal with trace IDs, service names, or
+ * timestamps.
  *
  * <h2>Usage in Controllers</h2>
+ * 
  * <pre>{@code
  * @RestController
  * @RequestMapping("/api/orders")
@@ -86,7 +90,8 @@ public class ResponseFactory {
 
     /**
      * Builds a success response with the given data, message, and HTTP status.
-     * <p>Use for non-200 successes such as {@link HttpStatus#CREATED}.
+     * <p>
+     * Use for non-200 successes such as {@link HttpStatus#CREATED}.
      */
     public <T> ResponseEntity<ApiSuccessResponse<T>> success(T data, String message, HttpStatus status) {
         return success(data, message, null, status);
@@ -101,17 +106,16 @@ public class ResponseFactory {
      * @param status   the HTTP status code
      */
     public <T> ResponseEntity<ApiSuccessResponse<T>> success(T data, String message,
-                                                              Map<String, Object> metadata, HttpStatus status) {
+            Map<String, Object> metadata, HttpStatus status) {
         var traceIds = TraceContext.current(tracer);
         var response = new ApiSuccessResponse<>(
-                properties.log().serviceName(),
+                properties.getLog().getServiceName(),
                 data,
                 message,
                 metadata,
                 Instant.now(),
                 traceIds.traceId(),
-                traceIds.spanId()
-        );
+                traceIds.spanId());
         return ResponseEntity.status(status).body(response);
     }
 
@@ -135,23 +139,23 @@ public class ResponseFactory {
      * Builds an error response with full control over all fields.
      *
      * @param errorCode the business error code
-     * @param message   a human-readable error message (falls back to error code default if null)
+     * @param message   a human-readable error message (falls back to error code
+     *                  default if null)
      * @param details   optional key-value details providing additional context
      */
     public <T> ResponseEntity<ApiErrorResponse<T>> error(ErrorCode errorCode, String message,
-                                                          Map<String, Object> details) {
+            Map<String, Object> details) {
         var traceIds = TraceContext.current(tracer);
         String path = resolveRequestPath();
         var response = new ApiErrorResponse<T>(
-                properties.log().serviceName(),
+                properties.getLog().getServiceName(),
                 errorCode.getCode(),
                 message != null ? message : errorCode.getDefaultMessage(),
                 details,
                 Instant.now(),
                 traceIds.traceId(),
                 traceIds.spanId(),
-                Optional.ofNullable(path)
-        );
+                Optional.ofNullable(path));
         return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
     }
 

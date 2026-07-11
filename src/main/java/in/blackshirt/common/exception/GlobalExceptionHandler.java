@@ -59,7 +59,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BaseException.class)
     public <T> ResponseEntity<ApiErrorResponse<T>> handleBaseException(BaseException ex) {
         ApiErrorResponse<T> error = ErrorResponseConverter.fromException(
-                properties.log().serviceName(), ex, tracer, request.getRequestURI());
+                properties.getLog().getServiceName(), ex, tracer, request.getRequestURI());
         log.error("BaseException handled: code={}, traceId={}, path={}",
                 error.errorCode(), error.traceId(), error.path().orElse("?"));
         return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(error);
@@ -71,7 +71,7 @@ public class GlobalExceptionHandler {
         InternalServerException baseEx = new InternalServerException(
                 StandardErrorCode.INTERNAL_SERVER_ERROR, ex.getMessage());
         ApiErrorResponse<T> error = ErrorResponseConverter.fromException(
-                properties.log().serviceName(), baseEx, tracer, request.getRequestURI());
+                properties.getLog().getServiceName(), baseEx, tracer, request.getRequestURI());
         log.error("Unexpected error", ex);
         return ResponseEntity.status(500).body(error);
     }

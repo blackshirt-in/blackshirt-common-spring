@@ -127,9 +127,15 @@ public class GlobalExceptionHandler {
                 traceIds.spanId(),
                 request.getRequestURI()
         );
-        log.error("BaseException handled: code={}, traceId={}, path={}",
-                error.errorCode(), error.traceId(), error.path().orElse("?"));
-        return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(error);
+        int httpStatusCode = ex.getErrorCode().getHttpStatus();
+        if (httpStatusCode >= 400 && httpStatusCode < 500) {
+            log.warn("BaseException handled: code={}, traceId={}, path={}, message={}",
+                    error.errorCode(), error.traceId(), error.path().orElse("?"), ex.getMessage());
+        } else {
+            log.error("BaseException handled: code={}, traceId={}, path={}, message={}",
+                    error.errorCode(), error.traceId(), error.path().orElse("?"), ex.getMessage(), ex);
+        }
+        return ResponseEntity.status(httpStatusCode).body(error);
     }
 
     @ExceptionHandler(Exception.class)

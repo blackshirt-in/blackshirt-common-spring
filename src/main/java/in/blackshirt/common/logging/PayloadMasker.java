@@ -23,4 +23,15 @@ public interface PayloadMasker {
      * @return a new map containing masked sensitive header values
      */
     Map<String, String> maskHeaders(Map<String, String> headers);
+
+    /**
+     * Masks an individual header value if its name matches a sensitive header.
+     *
+     * @param name header name
+     * @param value raw header value
+     * @return masked value or original value
+     */
+    default String maskHeaderValue(String name, String value) {
+        return value;
+    }
 }

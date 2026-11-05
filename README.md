@@ -13,7 +13,6 @@ A standardized, production-grade Spring Boot utility library for the Blackshirt 
 - **Perimeter HTTP Logging Filter**: `RequestResponseLoggingFilter` traces every request and response at the servlet boundary, measuring execution time (`ms`) and injecting `traceId` / `spanId` into SLF4J's `MDC`.
 - **Zero Repeat Logging**: Eliminates duplicate log lines. Entry and exit are logged cleanly once, and client code never needs to catch-and-log before rethrowing.
 - **Property-Driven & Code-Extensible Masking**: Sanitizes sensitive JSON fields (`password`, `token`, `secret`, `cvv`, etc.) and HTTP headers (`Authorization`, `Cookie`, etc.). Client microservices can append domain-specific fields in `application.yml` or via a programmatic `@Bean MaskingCustomizer`.
-- **Stream & Memory Safety Guard**: `ContentTypeGuard` prevents `OutOfMemoryError` by whitelisting text/JSON/XML payloads and bypassing `multipart/form-data`, file downloads, and Server-Sent Events (SSE).
 - **Distributed Tracing Integration**: `TraceContext` seamlessly bridges Micrometer Tracing (OpenTelemetry or Brave) to extract current span identifiers.
 - **Zero-Boilerplate Auto-Configuration**: Automatically registers all filters, maskers, and handlers via Spring Boot's `AutoConfiguration.imports`.
 
@@ -57,8 +56,6 @@ blackshirt:
   logging:
     # Enable or disable the perimeter RequestResponseLoggingFilter (default: true)
     enabled: true
-    # Header name to read/propagate trace correlation ID (default: X-Trace-Id)
-    trace-header-name: X-Trace-Id
     # Include sanitized HTTP headers in incoming request logs (default: false)
     include-headers: false
     # Include masked request and response bodies in logs (default: false)

@@ -1,11 +1,11 @@
 package in.blackshirt.common.response;
 
 import in.blackshirt.common.config.BlackshirtProperties;
+import in.blackshirt.common.exception.code.ErrorCode;
 import in.blackshirt.common.logging.TraceContext;
 import io.micrometer.tracing.Tracer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -61,7 +61,6 @@ import java.util.Optional;
  * @see ApiErrorResponse
  * @see ErrorCode
  */
-@Component
 public class ResponseFactory {
 
     private final Tracer tracer;
@@ -69,7 +68,7 @@ public class ResponseFactory {
 
     public ResponseFactory(Tracer tracer, BlackshirtProperties properties) {
         this.tracer = tracer;
-        this.properties = properties;
+        this.properties = properties != null ? properties : new BlackshirtProperties();
     }
 
     // ────────────────────── Success Responses ──────────────────────
@@ -109,7 +108,7 @@ public class ResponseFactory {
             Map<String, Object> metadata, HttpStatus status) {
         var traceIds = TraceContext.current(tracer);
         var response = new ApiSuccessResponse<>(
-                properties.getLog().getServiceName(),
+                properties.getServiceName(),
                 data,
                 message,
                 metadata,
@@ -148,7 +147,7 @@ public class ResponseFactory {
         var traceIds = TraceContext.current(tracer);
         String path = resolveRequestPath();
         var response = new ApiErrorResponse<T>(
-                properties.getLog().getServiceName(),
+                properties.getServiceName(),
                 errorCode.getCode(),
                 message != null ? message : errorCode.getDefaultMessage(),
                 details,

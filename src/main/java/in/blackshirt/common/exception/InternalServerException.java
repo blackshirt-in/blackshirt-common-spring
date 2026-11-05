@@ -1,6 +1,6 @@
 package in.blackshirt.common.exception;
 
-import in.blackshirt.common.response.ErrorCode;
+import in.blackshirt.common.exception.code.ErrorCode;
 
 public class InternalServerException extends BaseException {
 

@@ -1,0 +1,67 @@
+name: Publish Production (Release)
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-and-test:
+    name: Validate Release Version & Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Validate Release Version for Prod (No SNAPSHOT)
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current project version: $VERSION"
+          if [[ "$VERSION" == *"SNAPSHOT"* ]]; then
+            echo "::error::Main branch must NOT contain SNAPSHOT in pom.xml for production release, but found '$VERSION'. Rejection enforced."
+            exit 1
+          fi
+          echo "Version '$VERSION' is a valid production release version."
+
+      - name: Run Tests
+        run: mvn -B clean test -ntp
+
+  publish-prod:
+    name: Publish Release to GitHub Packages
+    needs: validate-and-test
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Deploy Release Package
+        run: mvn -B clean deploy -DskipTests -ntp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -1,6 +1,6 @@
 package in.blackshirt.common.exception;
 
-import in.blackshirt.common.response.ErrorCode;
+import in.blackshirt.common.exception.code.ErrorCode;
 
 import java.util.HashMap;
 import java.util.Map;

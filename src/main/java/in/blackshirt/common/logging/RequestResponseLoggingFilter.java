@@ -1,6 +1,8 @@
 package in.blackshirt.common.logging;
 
 import in.blackshirt.common.config.BlackshirtProperties;
+import in.blackshirt.common.tenant.TenantContextHolder;
+import in.blackshirt.common.tenant.TenantContextProvider;
 import io.micrometer.tracing.Tracer;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,17 +21,17 @@ import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Enumeration;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /**
- * Perimeter servlet filter providing request correlation via SLF4J MDC,
- * clean non-duplicative request-in and request-out logging, duration tracking,
- * and property-driven payload and header masking.
+ * Perimeter servlet filter providing end-to-end request correlation, distributed tracing,
+ * multi-tenant context propagation into SLF4J MDC, structured request/response logging,
+ * payload and header masking, and exception tracking.
+ *
+ * <p>Correlation coordinates ({@code traceId}, {@code spanId}, {@code clientIp},
+ * {@code tenantId}, {@code callerService}, {@code userId}) are placed in SLF4J MDC
+ * and formatted uniformly by standard Spring Boot / Logback logging pattern properties
+ * (e.g. {@code logging.pattern.console} or {@code logging.pattern.correlation}).
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RequestResponseLoggingFilter extends OncePerRequestFilter {
@@ -37,9 +39,14 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(RequestResponseLoggingFilter.class);
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
+    public static final String TRACE_HEADER = "X-Trace-Id";
+    public static final String CALLER_SERVICE_HEADER = "X-Caller-Service";
     public static final String TRACE_ID_MDC_KEY = "traceId";
     public static final String SPAN_ID_MDC_KEY = "spanId";
     public static final String CLIENT_IP_MDC_KEY = "clientIp";
+    public static final String TENANT_ID_MDC_KEY = TenantContextProvider.TENANT_ID_MDC_KEY;
+    public static final String CALLER_SERVICE_MDC_KEY = TenantContextProvider.CALLER_SERVICE_MDC_KEY;
+    public static final String USER_ID_MDC_KEY = TenantContextProvider.USER_ID_MDC_KEY;
 
     private final BlackshirtProperties properties;
     private final PayloadMasker payloadMasker;
@@ -82,13 +89,12 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
 
         BlackshirtProperties.Logging logging = properties.getLogging();
         boolean includePayload = logging.isIncludePayload();
-        boolean isLoggableReq = includePayload && ContentTypeGuard.isLoggable(request.getContentType()) && !request.isAsyncStarted();
 
-        HttpServletRequest reqToUse = isLoggableReq
+        HttpServletRequest reqToUse = (includePayload && !request.isAsyncStarted())
                 ? new ContentCachingRequestWrapper(request, logging.getMaxPayloadLength())
                 : request;
 
-        HttpServletResponse resToUse = includePayload && !request.isAsyncStarted()
+        HttpServletResponse resToUse = (includePayload && !request.isAsyncStarted())
                 ? new ContentCachingResponseWrapper(response)
                 : response;
 
@@ -96,6 +102,10 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(reqToUse, resToUse);
+        } catch (Throwable ex) {
+            long duration = System.currentTimeMillis() - startTime;
+            logExceptionThrown(reqToUse, ex, duration, logging);
+            throw ex;
         } finally {
             try {
                 long duration = System.currentTimeMillis() - startTime;
@@ -111,15 +121,10 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
     }
 
     private void setupTraceContext(HttpServletRequest request, HttpServletResponse response) {
-        String traceHeaderName = properties.getLogging().getTraceHeaderName();
-        if (traceHeaderName == null || traceHeaderName.isBlank()) {
-            traceHeaderName = "X-Trace-Id";
-        }
-
         String traceId = "";
         String spanId = "";
 
-        Tracer tracer = tracerProvider.getIfAvailable();
+        Tracer tracer = tracerProvider != null ? tracerProvider.getIfAvailable() : null;
         if (tracer != null) {
             var traceIds = TraceContext.current(tracer);
             traceId = traceIds.traceId();
@@ -127,43 +132,74 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         }
 
         if (traceId == null || traceId.isBlank()) {
-            traceId = request.getHeader(traceHeaderName);
+            traceId = request.getHeader(TRACE_HEADER);
             if (traceId == null || traceId.isBlank()) {
-                traceId = request.getHeader("X-Correlation-ID");
-            }
-            if (traceId == null || traceId.isBlank()) {
-                traceId = UUID.randomUUID().toString().replace("-", "");
+                traceId = HttpLoggingUtils.generateTraceId();
             }
         }
 
         if (spanId == null || spanId.isBlank()) {
-            spanId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+            spanId = HttpLoggingUtils.generateSpanId();
         }
 
-        String clientIp = extractClientIp(request);
+        String clientIp = HttpLoggingUtils.extractClientIp(request);
 
         MDC.put(TRACE_ID_MDC_KEY, traceId);
         MDC.put(SPAN_ID_MDC_KEY, spanId);
         MDC.put(CLIENT_IP_MDC_KEY, clientIp);
 
-        response.setHeader(traceHeaderName, traceId);
+        // Ensure tenantId, callerService, and userId are bound to MDC
+        String tenantId = TenantContextHolder.getTenantId();
+        if ((tenantId == null || tenantId.isBlank()) && properties.getTenant() != null) {
+            tenantId = request.getHeader(properties.getTenant().getTenantHeaderName());
+        }
+        if (tenantId != null && !tenantId.isBlank()) {
+            MDC.put(TENANT_ID_MDC_KEY, tenantId);
+        }
+
+        String callerService = TenantContextHolder.getCallerService();
+        if ((callerService == null || callerService.isBlank() || "unknown-service".equals(callerService)) && properties.getTenant() != null) {
+            callerService = request.getHeader(properties.getTenant().getServiceHeaderName());
+            if (callerService == null || callerService.isBlank()) {
+                callerService = request.getHeader(CALLER_SERVICE_HEADER);
+            }
+        }
+        if (callerService != null && !callerService.isBlank()) {
+            MDC.put(CALLER_SERVICE_MDC_KEY, callerService);
+        }
+
+        String userId = TenantContextHolder.getUserId();
+        if (userId != null && !userId.isBlank()) {
+            MDC.put(USER_ID_MDC_KEY, userId);
+        }
+
+        response.setHeader(TRACE_HEADER, traceId);
     }
 
     private void logRequestIn(HttpServletRequest request, BlackshirtProperties.Logging logging) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("--> ").append(request.getMethod()).append(" ").append(request.getRequestURI());
-
-        String query = request.getQueryString();
-        if (query != null && !query.isBlank()) {
-            sb.append("?").append(payloadMasker.maskPayload(query));
+        if (!log.isInfoEnabled()) {
+            return;
         }
 
-        sb.append(" (client=").append(extractClientIp(request)).append(")");
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("--> ").append(request.getMethod()).append(' ').append(request.getRequestURI());
+
+        String query = request.getQueryString();
+        if (query != null && !query.isBlank() && logging.isIncludeQueryParams()) {
+            sb.append('?').append(payloadMasker.maskPayload(query));
+        }
+
+        sb.append(" (client=").append(HttpLoggingUtils.extractClientIp(request)).append(')');
 
         if (logging.isIncludeHeaders()) {
-            Map<String, String> headers = extractHeaders(request);
-            Map<String, String> maskedHeaders = payloadMasker.maskHeaders(headers);
-            sb.append(" | headers=").append(maskedHeaders);
+            HttpLoggingUtils.appendHeaders(sb, request, payloadMasker);
+        }
+
+        if (logging.isIncludePayload() && request instanceof ContentCachingRequestWrapper reqWrapper) {
+            String reqBody = HttpLoggingUtils.readCachedBody(reqWrapper.getContentAsByteArray(), reqWrapper.getCharacterEncoding(), logging.getMaxPayloadLength());
+            if (!reqBody.isEmpty()) {
+                sb.append(" | body=").append(payloadMasker.maskPayload(reqBody));
+            }
         }
 
         log.info(sb.toString());
@@ -173,30 +209,35 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
                                HttpServletResponse response,
                                long duration,
                                BlackshirtProperties.Logging logging) {
+        if (!log.isInfoEnabled()) {
+            return;
+        }
+
         int status = response.getStatus();
         HttpStatus httpStatus = HttpStatus.resolve(status);
         String reason = httpStatus != null ? httpStatus.getReasonPhrase() : String.valueOf(status);
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("<-- ").append(status).append(" ").append(reason)
-                .append(" ").append(request.getMethod()).append(" ").append(request.getRequestURI())
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("<-- ").append(status).append(' ').append(reason)
+                .append(' ').append(request.getMethod()).append(' ').append(request.getRequestURI())
                 .append(" [").append(duration).append("ms]");
+
+        if (logging.isIncludePathVariables()) {
+            HttpLoggingUtils.appendPathVariables(sb, request);
+        }
 
         if (logging.isIncludePayload()) {
             if (request instanceof ContentCachingRequestWrapper reqWrapper) {
-                String reqBody = getCachedBody(reqWrapper.getContentAsByteArray(), reqWrapper.getCharacterEncoding(), logging.getMaxPayloadLength());
-                if (!reqBody.isBlank()) {
-                    sb.append(" | ReqBody: ").append(payloadMasker.maskPayload(reqBody));
+                String reqBody = HttpLoggingUtils.readCachedBody(reqWrapper.getContentAsByteArray(), reqWrapper.getCharacterEncoding(), logging.getMaxPayloadLength());
+                if (!reqBody.isEmpty()) {
+                    sb.append(" | reqBody=").append(payloadMasker.maskPayload(reqBody));
                 }
             }
 
             if (response instanceof ContentCachingResponseWrapper resWrapper) {
-                String resContentType = resWrapper.getContentType();
-                if (ContentTypeGuard.isLoggable(resContentType)) {
-                    String resBody = getCachedBody(resWrapper.getContentAsByteArray(), resWrapper.getCharacterEncoding(), logging.getMaxPayloadLength());
-                    if (!resBody.isBlank()) {
-                        sb.append(" | ResBody: ").append(payloadMasker.maskPayload(resBody));
-                    }
+                String resBody = HttpLoggingUtils.readCachedBody(resWrapper.getContentAsByteArray(), resWrapper.getCharacterEncoding(), logging.getMaxPayloadLength());
+                if (!resBody.isEmpty()) {
+                    sb.append(" | resBody=").append(payloadMasker.maskPayload(resBody));
                 }
             }
         }
@@ -204,46 +245,9 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         log.info(sb.toString());
     }
 
-    private String getCachedBody(byte[] content, String characterEncoding, int maxLength) {
-        if (content == null || content.length == 0) {
-            return "";
-        }
-        try {
-            int length = Math.min(content.length, maxLength);
-            String charsetName = (characterEncoding != null && !characterEncoding.isBlank())
-                    ? characterEncoding
-                    : StandardCharsets.UTF_8.name();
-            String body = new String(content, 0, length, charsetName);
-            if (content.length > maxLength) {
-                body += "...[TRUNCATED]";
-            }
-            return body;
-        } catch (Exception e) {
-            return "[BINARY/UNPARSEABLE]";
-        }
-    }
-
-    private static String extractClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
-    }
-
-    private static Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        if (headerNames != null) {
-            while (headerNames.hasMoreElements()) {
-                String name = headerNames.nextElement();
-                headers.put(name, request.getHeader(name));
-            }
-        }
-        return headers;
+    private void logExceptionThrown(HttpServletRequest request, Throwable ex, long duration, BlackshirtProperties.Logging logging) {
+        log.error("XX- {} {} [{}ms] Exception: {}: {}",
+                request.getMethod(), request.getRequestURI(), duration,
+                ex.getClass().getSimpleName(), ex.getMessage(), ex);
     }
 }

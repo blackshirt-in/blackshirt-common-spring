@@ -1,0 +1,73 @@
+name: Cleanup Old Package Versions
+
+on:
+  schedule:
+    # 11:00 PM IST (UTC+05:30) = 17:30 UTC on Monday (1) and Wednesday (3)
+    - cron: '30 17 * * 1,3'
+  workflow_run:
+    # Automatically triggers after a successful Stage or Prod deployment
+    workflows:
+      - "Publish Stage (SNAPSHOT)"
+      - "Publish Production (Release)"
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Prune Expired Packages (Keep 4 Releases, 2 Snapshots)
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────────────────────────
+      # 1. Prune Old SNAPSHOT Versions (Keep 2 latest)
+      # ─────────────────────────────────────────────────────────────
+      - name: Prune Old Snapshots (Keep latest 2)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'in.blackshirt.blackshirt-common-spring'
+          package-type: 'maven'
+          min-versions-to-keep: 2
+          delete-only-pre-release-versions: 'true'
+          token: ${{ secrets.PACKAGE_DELETE_TOKEN || secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Prune Old Snapshots (Fallback Artifact ID, Keep latest 2)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'blackshirt-common-spring'
+          package-type: 'maven'
+          min-versions-to-keep: 2
+          delete-only-pre-release-versions: 'true'
+          token: ${{ secrets.PACKAGE_DELETE_TOKEN || secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      # ─────────────────────────────────────────────────────────────
+      # 2. Prune Old RELEASE Versions (Keep 4 latest)
+      # ─────────────────────────────────────────────────────────────
+      - name: Prune Old Releases (Keep latest 4)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'in.blackshirt.blackshirt-common-spring'
+          package-type: 'maven'
+          min-versions-to-keep: 4
+          delete-only-pre-release-versions: 'false'
+          token: ${{ secrets.PACKAGE_DELETE_TOKEN || secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Prune Old Releases (Fallback Artifact ID, Keep latest 4)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'blackshirt-common-spring'
+          package-type: 'maven'
+          min-versions-to-keep: 4
+          delete-only-pre-release-versions: 'false'
+          token: ${{ secrets.PACKAGE_DELETE_TOKEN || secrets.GITHUB_TOKEN }}
+        continue-on-error: true

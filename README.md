@@ -1,32 +1,113 @@
 # Blackshirt Common Spring
 
-A standardized, production-grade Spring Boot utility library for the Blackshirt microservices ecosystem. It provides unified API response envelopes, centralized exception handling, automated perimeter request/response logging, sensitive payload masking, and distributed tracing correlation with zero boilerplate.
+[![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/technologies/downloads/#java21)
+[![Spring Boot 4.0.0](https://img.shields.io/badge/Spring%20Boot-4.0.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Version](https://img.shields.io/badge/Version-0.1.4-blue.svg)](pom.xml)
+[![Package](https://img.shields.io/badge/GitHub%20Packages-in.blackshirt-blueviolet.svg)](https://github.com/blackshirt-in/blackshirt-common-spring/packages)
+
+A standardized, production-grade Spring Boot 4 / Java 21 foundation library for the **Blackshirt microservices ecosystem**. It provides sealed API response envelopes, centralized tiered exception handling, automated perimeter request/response logging, sensitive PII payload masking, multi-tenant isolation, and distributed tracing correlation with zero boilerplate.
 
 ---
 
-## Features
+## Documentation Index
 
-- **Sealed API Response Envelopes**: Immutable record models (`BaseResponse<T>`, `ApiSuccessResponse<T>`, `ApiErrorResponse<T>`) guaranteeing consistent API responses across all microservices.
-- **`ResponseFactory`**: An injectable Spring bean that abstracts infrastructure concerns (tracing IDs, service name, timestamps, paths) and provides clean controller builder methods.
-- **Extensible Error Code Convention**: An `ErrorCode` contract following the platform convention (`{SERVICE_PREFIX}_{NNN}`) alongside `StandardErrorCode` for standard HTTP errors.
-- **Centralized Exception Handling**: Out-of-the-box `@RestControllerAdvice` (`GlobalExceptionHandler`) running at `@Order(LOWEST_PRECEDENCE)` that captures business and unexpected errors without stack trace pollution on 4xx rejections.
-- **Perimeter HTTP Logging Filter**: `RequestResponseLoggingFilter` traces every request and response at the servlet boundary, measuring execution time (`ms`) and injecting `traceId` / `spanId` into SLF4J's `MDC`.
-- **Zero Repeat Logging**: Eliminates duplicate log lines. Entry and exit are logged cleanly once, and client code never needs to catch-and-log before rethrowing.
-- **Property-Driven & Code-Extensible Masking**: Sanitizes sensitive JSON fields (`password`, `token`, `secret`, `cvv`, etc.) and HTTP headers (`Authorization`, `Cookie`, etc.). Client microservices can append domain-specific fields in `application.yml` or via a programmatic `@Bean MaskingCustomizer`.
-- **Distributed Tracing Integration**: `TraceContext` seamlessly bridges Micrometer Tracing (OpenTelemetry or Brave) to extract current span identifiers.
-- **Zero-Boilerplate Auto-Configuration**: Automatically registers all filters, maskers, and handlers via Spring Boot's `AutoConfiguration.imports`.
+Explore detailed design, usage examples, and deep dives for each core topic:
 
----
-
-## Prerequisites
-
-- **Java**: 21+
-- **Spring Boot**: 4.0.0+ (or 3.x compatible)
-- **Maven**: 3.8+
+| Topic | Document | Description |
+| :--- | :--- | :--- |
+| **API Responses** | [docs/api-responses.md](docs/api-responses.md) | Sealed records (`BaseResponse`, `ApiSuccessResponse`, `ApiErrorResponse`), `ResponseFactory` usage, and controller integration. |
+| **Exception Handling** | [docs/exception-handling.md](docs/exception-handling.md) | Centralized 5-tier ordered exception hierarchy, `{PREFIX}_{NNN}` error code contract, and zero-pollution logging. |
+| **Perimeter Logging** | [docs/logging.md](docs/logging.md) | `RequestResponseLoggingFilter`, `HttpLoggingUtils` zero-allocation processing, MDC binding, and standard logback patterns. |
+| **Data Masking** | [docs/masking.md](docs/masking.md) | Single-pass consolidated regex engine, PII header/payload sanitization, and programmatic `MaskingCustomizer`. |
+| **Tenant Context** | [docs/tenant-context.md](docs/tenant-context.md) | Multi-tenant isolation POJO, thread-local holder, perimeter filter, downstream HTTP interceptor, and async propagation. |
+| **Distributed Tracing** | [docs/distributed-tracing.md](docs/distributed-tracing.md) | W3C `traceparent` parsing, Micrometer Tracing integration, `X-Trace-Id` response headers, and APM correlation. |
+| **CI/CD & Workflows** | [docs/ci-cd-workflows.md](docs/ci-cd-workflows.md) | GitHub Actions dual-environment deployment (Stage SNAPSHOT vs Prod Release) and automated package retention cleanup. |
+| **AI Agent Skill** | [.github/skills/blackshirt-common-spring/SKILL.md](.github/skills/blackshirt-common-spring/SKILL.md) | LLM prompt and engineering rules with strict **Dos and Don'ts** for consuming and maintaining the library. |
 
 ---
 
-## Installation
+## Project Structure
+
+```text
+blackshirt-common-spring/
+├── .github/
+│   ├── skills/
+│   │   └── blackshirt-common-spring/
+│   │       └── SKILL.md                   # AI Agent guidance, rules, and Dos/Don'ts
+│   └── workflows/
+│       ├── cleanup-packages.yml           # Automated package retention (keeps 4 prod, 2 snapshots)
+│       ├── publish-prod.yml               # Production release publish workflow (main branch)
+│       └── publish-stage.yml              # Staging SNAPSHOT publish workflow (stage branch)
+├── docs/
+│   ├── api-responses.md                   # Sealed response models & ResponseFactory guide
+│   ├── ci-cd-workflows.md                 # CI/CD pipelines & GitHub Packages setup
+│   ├── distributed-tracing.md             # W3C traceparent & Micrometer Tracing guide
+│   ├── exception-handling.md              # 5-tier ordered exception handling architecture
+│   ├── logging.md                         # Boundary filter & zero-duplicate logging guide
+│   ├── masking.md                         # Sensitive data & PII masking engine
+│   └── tenant-context.md                  # Multi-tenant isolation & propagation guide
+├── src/
+│   ├── main/
+│   │   ├── java/in/blackshirt/common/
+│   │   │   ├── config/
+│   │   │   │   ├── BlackshirtAutoConfiguration.java   # Spring Boot auto-configuration entrypoint
+│   │   │   │   └── BlackshirtProperties.java          # Configuration properties (prefix: blackshirt)
+│   │   │   ├── exception/
+│   │   │   │   ├── code/                              # Error code contracts & standard enums
+│   │   │   │   │   ├── DatabaseErrorCode.java         # ERR-DB-xxx codes
+│   │   │   │   │   ├── ErrorCode.java                 # Base interface: {PREFIX}_{NNN} convention
+│   │   │   │   │   ├── HttpErrorCode.java             # ERR-HTTP-xxx codes
+│   │   │   │   │   ├── RuntimeErrorCode.java          # ERR-RT-xxx codes
+│   │   │   │   │   └── SystemErrorCode.java           # ERR-SYS-xxx codes
+│   │   │   │   ├── handler/                           # Tiered @RestControllerAdvice handlers
+│   │   │   │   │   ├── AbstractExceptionHandler.java  # Common base handler & response converter
+│   │   │   │   │   ├── BusinessExceptionHandler.java  # Catches BaseException (Order: HIGHEST + 300)
+│   │   │   │   │   ├── DatabaseExceptionHandler.java  # Catches DataAccessException (Order: HIGHEST + 200)
+│   │   │   │   │   ├── ExceptionHandlerOrder.java     # Explicit precedence constants
+│   │   │   │   │   ├── FallbackExceptionHandler.java  # Catches Throwable (Order: LOWEST)
+│   │   │   │   │   ├── HttpExceptionHandler.java      # Catches Spring Web MVC (Order: HIGHEST + 100)
+│   │   │   │   │   └── JavaRuntimeExceptionHandler.java # Catches NPE, IllegalArgument (Order: HIGHEST + 400)
+│   │   │   │   ├── BaseException.java                 # Standard business exception
+│   │   │   │   ├── ErrorDetailKeys.java               # Standard diagnostic keys
+│   │   │   │   ├── ErrorResponseConverter.java        # Converter abstraction
+│   │   │   │   └── InternalServerException.java       # Unchecked 500 exception wrapper
+│   │   │   ├── logging/
+│   │   │   │   ├── HttpLoggingUtils.java              # Zero-allocation header streaming & IP extraction
+│   │   │   │   ├── JsonPayloadMasker.java             # Single-pass regex masking engine
+│   │   │   │   ├── MaskingCustomizer.java             # Functional interface for custom rules
+│   │   │   │   ├── PayloadMasker.java                 # Pluggable masking engine interface
+│   │   │   │   ├── RequestResponseLoggingFilter.java  # Perimeter servlet filter (Order: HIGHEST + 10)
+│   │   │   │   └── TraceContext.java                  # Micrometer tracer bridge utility
+│   │   │   ├── response/
+│   │   │   │   ├── ApiErrorResponse.java              # Sealed error envelope record
+│   │   │   │   ├── ApiSuccessResponse.java            # Sealed success envelope record
+│   │   │   │   ├── BaseResponse.java                  # Sealed root interface
+│   │   │   │   └── ResponseFactory.java               # Injectable response builder bean
+│   │   │   └── tenant/
+│   │   │       ├── MissingTenantException.java        # Thrown when tenant header is missing
+│   │   │       ├── TenantClientRequestInterceptor.java # Downstream RestClient / RestTemplate propagation
+│   │   │       ├── TenantContext.java                 # Multi-tenant coordinate POJO
+│   │   │       ├── TenantContextFilter.java           # Perimeter servlet filter (Order: HIGHEST + 5)
+│   │   │       ├── TenantContextHolder.java           # ThreadLocal storage utility
+│   │   │       └── TenantContextProvider.java         # Spring bean context manager & MDC binder
+│   │   └── resources/
+│   │       └── META-INF/spring/
+│   │           └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
+│   └── test/
+│       └── java/in/blackshirt/common/                 # 100% passing unit & integration test suite (64 tests)
+├── pom.xml                                            # Maven configuration & GitHub Packages distribution
+└── README.md                                          # Project documentation entry point
+```
+
+---
+
+## Installation & Dependency Setup
+
+The package is hosted on **GitHub Packages**. To consume `blackshirt-common-spring` in your microservice:
+
+### Current Version: `0.1.4`
+
+### 1. Maven Configuration
 
 Add the dependency to your microservice's `pom.xml`:
 
@@ -34,68 +115,128 @@ Add the dependency to your microservice's `pom.xml`:
 <dependency>
     <groupId>in.blackshirt</groupId>
     <artifactId>blackshirt-common-spring</artifactId>
-    <version>0.1.3</version>
+    <version>0.1.4</version>
 </dependency>
 ```
 
-> [!NOTE]
-> All core components are auto-configured via Spring Boot. No `@ComponentScan` or `@Enable...` annotations are required in your application.
+#### GitHub Packages Repository in `pom.xml`:
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <name>GitHub Packages</name>
+        <url>https://maven.pkg.github.com/blackshirt-in/blackshirt-common-spring</url>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </repository>
+</repositories>
+```
+
+#### Authentication in `~/.m2/settings.xml`:
+To authenticate against GitHub Packages, configure your `settings.xml` with a GitHub Personal Access Token (PAT) having `read:packages` scope:
+
+```xml
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <servers>
+        <server>
+            <id>github</id>
+            <username>YOUR_GITHUB_USERNAME</username>
+            <password>${env.GITHUB_TOKEN}</password>
+        </server>
+    </servers>
+</settings>
+```
 
 ---
 
-## Configuration Reference (`application.yml`)
+### 2. Gradle Configuration
 
-Configure the library in your microservice's `application.yml`:
+#### Groovy DSL (`build.gradle`):
+```groovy
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/blackshirt-in/blackshirt-common-spring")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+dependencies {
+    implementation 'in.blackshirt:blackshirt-common-spring:0.1.4'
+}
+```
+
+#### Kotlin DSL (`build.gradle.kts`):
+```kotlin
+repositories {
+    mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/blackshirt-in/blackshirt-common-spring")
+        credentials {
+            username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+dependencies {
+    implementation("in.blackshirt:blackshirt-common-spring:0.1.4")
+}
+```
+
+---
+
+## Quick Start Configuration (`application.yml`)
+
+Add standard settings to your microservice's `application.yml`:
 
 ```yaml
 blackshirt:
   log:
-    # Service name included in all ApiSuccessResponse and ApiErrorResponse envelopes
-    serviceName: notification-service
+    # Microservice identifier attached to response envelopes and MDC
+    serviceName: order-service
 
   logging:
-    # Enable or disable the perimeter RequestResponseLoggingFilter (default: true)
     enabled: true
-    # Include sanitized HTTP headers in incoming request logs (default: false)
     include-headers: false
-    # Include masked request and response bodies in logs (default: false)
     include-payload: false
-    # Maximum payload characters to cache/log before truncating (default: 4096)
     max-payload-length: 4096
-    # Paths excluded from logging and tracing filters
     exclude-paths:
       - /actuator/**
       - /swagger-ui/**
       - /v3/api-docs/**
       - /favicon.ico
       - /error
-
-    # Sensitive data masking engine
     masking:
-      # Enable or disable payload/header masking (default: true)
       enabled: true
-      # Replacement string for masked values (default: "***")
       mask-replacement: "***"
-      # Append service-specific fields without overwriting default base fields:
       additional-masked-fields:
-        - recipientEmail
-        - recipientPhone
         - otpCode
-        - webhookSecret
-        - apiKey
-      # Append service-specific headers:
-      additional-masked-headers:
-        - x-custom-api-key
-        - x-provider-token
+        - panNumber
+
+  tenant:
+    enabled: true
+    require-tenant-id: false
+    propagate-to-mdc: true
+
+logging:
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%15.15t]){faint} %clr([%X{traceId:-},%X{spanId:-}]){cyan} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n"
 ```
 
 ---
 
-## Usage Guide
+## Core Usage Examples
 
-### 1. Centralized Responses with `ResponseFactory`
+### 1. Controllers Returning Standard Envelopes
 
-Inject `ResponseFactory` into your controllers to construct standardized responses:
+Inject `ResponseFactory` to build standardized envelopes:
 
 ```java
 @RestController
@@ -112,55 +253,25 @@ public class OrderController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiSuccessResponse<OrderDto>> getOrder(@PathVariable String id) {
-        OrderDto order = orderService.findById(id);
-        return responseFactory.success(order, "Order retrieved successfully");
+        return responseFactory.success(orderService.findById(id), "Order retrieved");
     }
 
     @PostMapping
-    public ResponseEntity<ApiSuccessResponse<OrderDto>> createOrder(@RequestBody CreateOrderRequest request) {
-        OrderDto order = orderService.create(request);
+    public ResponseEntity<ApiSuccessResponse<OrderDto>> createOrder(@Valid @RequestBody CreateOrderRequest req) {
+        OrderDto order = orderService.create(req);
         return responseFactory.created(order, "/api/v1/orders/" + order.id());
     }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<ApiSuccessResponse<Void>> deleteOrder(@PathVariable String id) {
-        orderService.delete(id);
-        return responseFactory.noContent();
-    }
 }
 ```
 
-#### JSON Success Response Format:
-```json
-{
-  "serviceName": "order-service",
-  "status": "SUCCESS",
-  "message": "Order retrieved successfully",
-  "data": {
-    "id": "ord_1024",
-    "amount": 250.00
-  },
-  "timestamp": "2026-10-18T12:00:00.123Z",
-  "traceId": "9f8a2b3c4d5e6f7a",
-  "spanId": "b1c2d3e4f5a6b7c8",
-  "path": "/api/v1/orders/ord_1024"
-}
-```
+### 2. Throwing Domain Exceptions
 
----
-
-### 2. Domain Exceptions & Error Codes
-
-#### Define Domain Error Codes
-Implement the `ErrorCode` interface using an enum following the `{PREFIX}_{NNN}` convention:
+Throw `BaseException` using domain enums implementing `ErrorCode`:
 
 ```java
 public enum OrderErrorCode implements ErrorCode {
-
-    INSUFFICIENT_STOCK("ORD_001", "Insufficient inventory stock for requested items", 400),
-    ORDER_NOT_FOUND("ORD_002", "Requested order could not be found", 404),
-    PAYMENT_FAILED("ORD_003", "Payment processing failed", 402),
-    ORDER_EXPIRED("ORD_004", "Order has expired and can no longer be processed", 410);
+    ORDER_NOT_FOUND("ORD_001", "Order was not found", 404),
+    INSUFFICIENT_STOCK("ORD_002", "Inventory stock insufficient", 400);
 
     private final String code;
     private final String defaultMessage;
@@ -176,189 +287,34 @@ public enum OrderErrorCode implements ErrorCode {
     @Override public String getDefaultMessage() { return defaultMessage; }
     @Override public int getHttpStatus() { return httpStatus; }
 }
+
+// In your service:
+throw new BaseException(OrderErrorCode.ORDER_NOT_FOUND, "Order " + orderId + " not found");
 ```
 
-#### Throw Domain Exceptions Extending `BaseException`
-```java
-@Service
-public class OrderService {
+### 3. Multi-Tenant Context Access
 
-    public OrderDto findById(String id) {
-        return orderRepository.findById(id)
-                .orElseThrow(() -> new BaseException(OrderErrorCode.ORDER_NOT_FOUND, "Order " + id + " not found"));
-    }
-
-    public void reserveStock(String sku, int quantity) {
-        if (inventory.getStock(sku) < quantity) {
-            Map<String, Object> details = Map.of("sku", sku, "available", 2, "requested", quantity);
-            throw new BaseException(OrderErrorCode.INSUFFICIENT_STOCK, "Not enough items in stock", details);
-        }
-    }
-}
-```
-
----
-
-### 3. Global Exception Handling
-
-All uncaught exceptions and `BaseException`s are automatically intercepted by `GlobalExceptionHandler`:
-- **4xx Client Errors**: Logged as a concise **`WARN` single-line** without noisy 50-line stack traces.
-- **5xx Server Errors**: Logged as **`ERROR` with full stack trace exactly once**.
-
-#### JSON Error Response Format:
-```json
-{
-  "serviceName": "order-service",
-  "errorCode": "ORD_001",
-  "errorMessage": "Not enough items in stock",
-  "details": {
-    "sku": "BLK-TSHIRT-L",
-    "available": 2,
-    "requested": 5
-  },
-  "timestamp": "2026-10-18T12:05:00.450Z",
-  "traceId": "9f8a2b3c4d5e6f7a",
-  "spanId": "b1c2d3e4f5a6b7c8",
-  "path": "/api/v1/orders"
-}
-```
-
-#### Custom Service-Specific Exception Handlers (Optional)
-Client microservices can register their own higher-priority handlers:
+Read tenant coordinates anywhere in service code:
 
 ```java
-@RestControllerAdvice
-@Order(Ordered.HIGHEST_PRECEDENCE)
-public class CustomOrderExceptionHandler {
-
-    @ExceptionHandler(PaymentGatewayException.class)
-    public ResponseEntity<ApiErrorResponse<Object>> handlePaymentError(PaymentGatewayException ex) {
-        // Runs BEFORE GlobalExceptionHandler
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(ApiErrorResponse.error("order-service", OrderErrorCode.PAYMENT_FAILED, ex.getMessage(), null, null, null, null));
-    }
-}
+String currentTenant = TenantContextHolder.getTenantId();
+Optional<String> currentUser = TenantContextHolder.getOptionalUserId();
 ```
 
 ---
 
-### 4. Automated Request & Response Tracing
+## Building & Verification
 
-The perimeter filter `RequestResponseLoggingFilter` automatically manages the request lifecycle:
-1. Injects `traceId`, `spanId`, and `clientIp` into SLF4J's `MDC`.
-2. Adds `X-Trace-Id` to outgoing HTTP response headers.
-3. Automatically logs single-line entry and exit metrics:
+To run all unit tests locally:
 
-```text
-2026-10-18 12:10:00.100 [exec-1] [traceId=a1b2c3d4,spanId=e5f6] INFO RequestResponseLoggingFilter - --> POST /api/v1/orders (client=10.0.0.5)
-2026-10-18 12:10:00.125 [exec-1] [traceId=a1b2c3d4,spanId=e5f6] INFO OrderService                 - Creating order for customerId=108
-2026-10-18 12:10:00.145 [exec-1] [traceId=a1b2c3d4,spanId=e5f6] INFO RequestResponseLoggingFilter - <-- 201 Created POST /api/v1/orders [45ms]
+```bash
+mvn test
 ```
 
----
-
-### 5. Sensitive Data Masking Configuration
-
-#### Option A: Property-Driven (Zero Java Code)
-Simply add fields to `application.yml`:
-```yaml
-blackshirt:
-  logging:
-    masking:
-      additional-masked-fields:
-        - rawCreditCardNumber
-        - ssn
-        - userPin
-```
-
-#### Option B: Programmatic Client Hook (`MaskingCustomizer`)
-Register a Spring bean in your client microservice:
-```java
-@Configuration
-public class SecurityLoggingConfig {
-
-    @Bean
-    public MaskingCustomizer customMaskingCustomizer() {
-        return masking -> {
-            masking.getAdditionalMaskedFields().add("vendorApiKey");
-            masking.getAdditionalMaskedHeaders().add("X-Vendor-Signature");
-            masking.setMaskReplacement("[PROTECTED]");
-        };
-    }
-}
-```
-
-#### Option C: Custom Masking Algorithm (`PayloadMasker`)
-Replace the default masking engine with a specialized implementation (e.g., PCI-DSS partial masking) via `@Bean`:
-```java
-@Configuration
-public class PciLoggingConfig {
-
-    @Bean
-    public PayloadMasker payloadMasker(BlackshirtProperties properties) {
-        return new CustomPciCompliantMasker(properties.getLogging().getMasking());
-    }
-}
-```
-
----
-
-### 6. Distributed Tracing (`TraceContext`)
-
-Access active distributed tracing identifiers anywhere in your application:
-
-```java
-Tracer tracer = ...; // Injected Micrometer Tracer
-TraceContext.TraceIds traceIds = TraceContext.current(tracer);
-
-String traceId = traceIds.traceId();
-String spanId = traceIds.spanId();
-```
-
----
-
-## Client Code Best Practices (Anti-Duplication Rules)
-
-To maintain clean, readable production logs across all services:
-
-1. **Only Log Domain Milestones**:
-   ```java
-   // ✅ GOOD:
-   log.info("Processing shipment for orderId={}", orderId);
-
-   // ❌ BAD: Redundant (filter already logs entry, exit, timing)
-   log.info("Entering createOrder()");
-   ```
-
-2. **Never Catch-and-Log Before Rethrowing**:
-   ```java
-   // ✅ GOOD: GlobalExceptionHandler logs it once with context
-   if (!isValid(request)) {
-       throw new BaseException(OrderErrorCode.INVALID_REQUEST, "Invalid order");
-   }
-
-   // ❌ BAD: Results in 2 or 3 duplicate stack traces in your log aggregators!
-   try {
-       processOrder();
-   } catch (Exception ex) {
-       log.error("Order failed", ex); // DUPLICATE LOG!
-       throw ex;
-   }
-   ```
-
----
-
-## Building & Testing
-
-To build the library, run the test suite, and install to your local Maven repository:
+To build and install the JAR to your local `.m2` repository:
 
 ```bash
 mvn clean install
-```
-
-To run only the unit tests:
-```bash
-mvn test
 ```
 
 ---
